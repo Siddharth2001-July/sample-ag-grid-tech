@@ -1,5 +1,3 @@
-
-  <button (click)="csvDown()">Download as CSV</button>
   <ag-grid-angular
   class="ag-theme-alpine"
   style="height: 550px; width: 850px;"
@@ -10,5 +8,7 @@
   [rowSelection]="'multiple'"
   [animateRows]="true"
   (gridReady)="onGridReady($event)"
+  [getContextMenuItems]="getContextMenuItems"
+  [preventDefaultOnContextMenu]="true"
   >
   </ag-grid-angular>

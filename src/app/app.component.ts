@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, OnInit, ViewChild } from '@angular/core';
-import { GridOptions, ColDef, ColumnApi, GridApi, GetContextMenuItems } from 'ag-grid-community';
+import { GridOptions, ColDef, ColumnApi, GridApi, GetContextMenuItems, MenuItemDef, GetContextMenuItemsParams } from 'ag-grid-community';
 
 import { AppService } from './app.service';
 import { Observable } from 'rxjs';
@@ -11,14 +11,14 @@ import { Observable } from 'rxjs';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
-  api: any;
+  // api: any;
   gridApi!: GridApi;
   colApi!: ColumnApi;
   rowData: any[] = [];
   // colName = ["name", "phone", "email", "country"];
   colName = [
     { name: "name", isExportable: true },
-    { name: "phone", isExportable: false },
+    { name: "phone", isExportable: true },
     { name: "email", isExportable: false },
     { name: "country", isExportable: true }
   ];
@@ -31,7 +31,7 @@ export class AppComponent implements OnInit {
     // pagination: true,
     // paginationPageSize: 10
   }
-  constructor(private http: HttpClient, private csvFormat: AppService) { }
+  constructor(private http: HttpClient, private service: AppService) { }
   ngOnInit() {
     this.getData().subscribe({
       next: (data) => {
@@ -48,47 +48,90 @@ export class AppComponent implements OnInit {
     return this.http.get<any[]>('assets/data.json').pipe();
   }
   onGridReady = (params: any) => {
-    this.api = params.api;
+    // this.api = params.api;
     this.colApi = params.columnApi;
     this.gridApi = params.api;
   }
-  csvDown() {
-    let downData = structuredClone(this.rowData);
-    let currColName: string[] = []
-    let removeCols: any[] = []
-    let currRows = this.gridApi.getFilterModel()
-    let filterVals = Object.values(currRows);
-    let filterKeys = Object.keys(currRows);
-    let presentValues: string[] = []
-    let filteredRows: any[] = []
-    filterVals.forEach((val) => {
-      val.values.forEach((value: any) => {
-        presentValues.push(value)
-      })
-    })
-    filterKeys.forEach((key: any) => {
-      downData.forEach((row: any) => {
-        if (presentValues.includes(row[key])) {
-          filteredRows.push(row)
+  public getContextMenuItems = (
+    params: GetContextMenuItemsParams
+  ): (string | MenuItemDef)[] => {
+    let res: (string | MenuItemDef)[] =
+      [
+        "cut",
+        "copy",
+        "copyWithHeaders",
+        "copyWithGroupHeaders",
+        "paste",
+        {
+          name: 'Custom CSV Export',
+          action: () => {
+            this.exportFile("csv");
+          }
+        },
+        {
+          name: 'Custom Excel Export',
+          action: () => {
+            this.exportFile("xlsx");
+          }
         }
-      })
-    })
-    if (filterKeys.length > 0) downData = filteredRows;
+      ]
+    return res;
+  }
+  public exportFile(type: string) {
+    // let downData = structuredClone(this.rowData)
+    let currData: any = []
+    let count = this.gridApi.getDisplayedRowCount();
+    for (let i = 0; i < count; i++) {
+      let rowNode = this.gridApi.getDisplayedRowAtIndex(i);
+      if(rowNode != undefined)
+        currData.push(rowNode.data);
+    }
+    let downData = structuredClone(currData)
+    let currColName: string[] = []
+    let removeCols: string[] = []
+    // let currRows = this.gridApi.getFilterModel()
+    // let filterVals = Object.values(currRows);
+    // let filterKeys = Object.keys(currRows);
+    // let presentValues: string[] = []
+    // let filteredRows: any[] = []
+    // filterVals.forEach((val) => {
+    //   val.values.forEach((value: any) => {
+    //     presentValues.push(value)
+    //   })
+    // })
+    // filterKeys.forEach((key: any) => {
+    //   downData.forEach((row: any) => {
+    //     if (presentValues.includes(row[key])) {
+    //       filteredRows.push(row)
+    //     }
+    //   })
+    // })
+    // if (filterKeys.length > 0) downData = filteredRows;
     this.colApi.getAllDisplayedColumns().forEach((val) => {
       let name = String(val.getColDef().field)
       currColName.push(name)
     })
-    removeCols = this.colName.filter((o) => currColName.indexOf(o.name) === -1);
+    let filt = this.colName.filter((o) => currColName.indexOf(o.name) === -1);
+    filt.forEach((obj) => removeCols.push(obj.name))
     this.colName.forEach((column) => {
       if (!column.isExportable) {
         removeCols.push(column.name)
-        let i = currColName.indexOf(column.name)
-        delete currColName[i]
       }
     })
     downData.forEach((val: any) => {
-      removeCols.forEach(key => delete val[key])
+      removeCols.forEach(key => {
+        delete val[key]
+      })
     });
-    this.csvFormat.downloadFile(downData, "Table_Data", currColName)
+    if (type == "csv") {
+      this.service.exportAsCsvFile(downData, "CSV_Data")
+    }
+    else if (type == "xlsx") {
+      this.service.exportAsExcelFile(downData, "Excel_Data");
+    }
+    else {
+      window.alert("Invalid export format");
+    }
+    // console.log(daa);
   }
 }
